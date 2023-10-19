@@ -1,0 +1,31 @@
+---
+env:
+  browser: true
+  es2023: true
+  node: true
+  jest/globals: true
+
+extends:
+  - airbnb-base
+  - prettier
+
+plugins:
+  - jest
+
+parserOptions:
+  ecmaVersion: 14
+  sourceType: module
+
+rules:
+  import/extensions: off
+  indent: ['warn', 4, { 'SwitchCase': 1, 'ignoreComments': true }]
+  no-await-in-loop: warn
+  no-console: ['warn', { 'allow': ['info', 'warn', 'error'] }]
+  no-restricted-syntax: off
+  no-shadow: off
+  no-unused-vars: warn
+  no-use-before-define: warn
+  prefer-destructuring: off
+  prefer-template: off
+  consistent-return: off
+  no-underscore-dangle: [error, { allow: ['_id'] }]
