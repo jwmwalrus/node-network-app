@@ -1,4 +1,5 @@
 import React, { Component, Fragment } from 'react';
+import openSocket from 'socket.io-client';
 
 import Post from '../../components/Feed/Post/Post';
 import Button from '../../components/Button/Button';
@@ -37,7 +38,58 @@ class Feed extends Component {
             .catch(this.catchError);
 
         this.loadPosts();
+
+        const socket = openSocket(baseUrl);
+        socket.on('posts', (data) => {
+            switch (data.action) {
+                case 'create':
+                // fallthrough
+                case 'update':
+                    console.info('Adding/updating post');
+                    this.updatePost(data.post);
+                    break;
+
+                case 'delete':
+                    console.info('Removing post');
+                    this.deletePost(data.post);
+                    break;
+
+                default:
+                    break;
+            }
+        });
     }
+
+    updatePost = (post) => {
+        this.setState((prevState) => {
+            const updatedPosts = [...prevState.posts];
+            let totalPosts = prevState.totalPosts;
+            const updatedPostIndex = updatedPosts.findIndex(
+                (p) => p._id === post._id,
+            );
+            if (updatedPostIndex > -1) {
+                updatedPosts[updatedPostIndex] = post;
+            } else {
+                totalPosts = updatedPosts.unshift(post);
+            }
+            return {
+                posts: updatedPosts,
+                totalPosts,
+            };
+        });
+    };
+
+    deletePost = (post) => {
+        this.setState((prevState) => {
+            const updatedPosts = prevState.posts.filter(
+                (p) => p._id.toString() !== post._id.toString(),
+            );
+            return {
+                posts: updatedPosts,
+                totalPosts: updatedPosts.length,
+            };
+        });
+    };
 
     loadPosts = (direction) => {
         if (direction) {
@@ -56,7 +108,7 @@ class Feed extends Component {
             headers: { Authorization: 'Bearer ' + this.props.token },
         })
             .then((res) => {
-                if (res.status !== 200) {
+                if (!res.ok) {
                     throw new Error('Failed to fetch posts.');
                 }
                 return res.json();
@@ -135,7 +187,7 @@ class Feed extends Component {
             body: fd,
         })
             .then((res) => {
-                if (res.status !== 200 && res.status !== 201) {
+                if (!res.ok) {
                     throw new Error('Creating/editing post failed');
                 }
                 return res.json();
@@ -190,16 +242,15 @@ class Feed extends Component {
             method: 'DELETE',
         })
             .then((res) => {
-                if (res.status !== 200 && res.status !== 201) {
+                if (!res.ok) {
                     throw new Error('Deleting a post failed!');
                 }
-                return res.json();
+                return Promise.resolve();
             })
-            .then((resData) => {
-                console.log({ resData });
+            .then(() => {
                 this.setState((prevState) => {
                     const updatedPosts = prevState.posts.filter(
-                        (p) => p._id !== postId,
+                        (p) => p._id.toString() !== postId,
                     );
                     return { posts: updatedPosts, postsLoading: false };
                 });

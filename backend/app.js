@@ -1,3 +1,4 @@
+import { createServer } from 'http';
 import { resolve, basename, extname } from 'path';
 
 import express from 'express';
@@ -7,6 +8,7 @@ import multer from 'multer';
 
 import { connect } from 'mongoose';
 
+import socket from './socket.js';
 import feedRoutes from './routes/feeds.js';
 import authRoutes from './routes/auth.js';
 
@@ -65,7 +67,15 @@ app.use((error, req, res, next) => {
 
 try {
     await connect(process.env.MONGODB_URI);
-    app.listen(8080);
+
+    const server = createServer(app);
+
+    const io = socket.init(server);
+    io.on('connection', (client) => {
+        console.info('Client connected');
+    });
+
+    server.listen(8080);
 } catch (e) {
     console.error(e);
 }

@@ -6,6 +6,7 @@ import { validationResult } from 'express-validator';
 import Post from '../models/post.js';
 import User from '../models/user.js';
 import AppError from '../middleware/errors.js';
+import socket from '../socket.js';
 
 const ITEMS_PER_PAGE = 2;
 const dummyImage = '/image/dummy.png';
@@ -36,9 +37,10 @@ export const getPosts = async (req, res, next) => {
         const totalItems = await Post.find().count();
         if (totalItems > 0) {
             posts = await Post.find()
+                .populate('creator')
+                .sort({ createdAt: -1 })
                 .skip((currentPage - 1) * ITEMS_PER_PAGE)
-                .limit(ITEMS_PER_PAGE)
-                .populate('creator');
+                .limit(ITEMS_PER_PAGE);
         }
 
         let totalPages = Math.floor(totalItems / ITEMS_PER_PAGE);
@@ -84,13 +86,18 @@ export const createPost = async (req, res, next) => {
             creator: user._id,
         });
         await post.save();
+        await post.populate('creator');
 
         user.posts.push(post);
         await user.save();
 
+        console.info('Emitting created post');
+        socket.getIO().emit('posts', { action: 'create', post });
+
+        const creator = { _id: user._id, name: user.name };
         res.status(201).json({
-            post,
-            creator: { _id: user._id, name: user.name },
+            post: { ...post, creator },
+            creator,
         });
     } catch (e) {
         next(new AppError('Failed to create post', { cause: e }), req, res);
@@ -114,14 +121,14 @@ export const updatePost = async (req, res, next) => {
     const { title, content } = req.body;
 
     try {
-        const post = await Post.findById(postId);
+        const post = await Post.findById(postId).populate('creator');
         if (post == null) {
             const e = new Error('Post does not exist');
             e.code = 404;
             throw e;
         }
 
-        if (req.userId !== post.creator.toString()) {
+        if (req.userId !== post.creator._id.toString()) {
             const e = new Error('Not authorized');
             e.code = 403;
             throw e;
@@ -146,6 +153,9 @@ export const updatePost = async (req, res, next) => {
         post.content = content;
         post.imageUrl = imageUrl;
         await post.save();
+
+        console.info('Emitting update post');
+        socket.getIO().emit('posts', { action: 'update', post });
 
         res.status(200).json({ post });
     } catch (e) {
@@ -183,7 +193,10 @@ export const deletePost = async (req, res, next) => {
         user.posts.pull(postId);
         await user.save();
 
-        res.status(204);
+        console.info('Emitting delete post');
+        socket.getIO().emit('posts', { action: 'delete', post });
+
+        res.status(204).send();
     } catch (e) {
         next(
             new AppError('Failed to delete post', { cause: e, code: e.code }),
