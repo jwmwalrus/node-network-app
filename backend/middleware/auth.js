@@ -1,11 +1,12 @@
 import jwt from 'jsonwebtoken';
 
-const isAuth = (req, res, next) => {
+const auth = (req, res, next) => {
     const authorization = req.get('Authorization');
+
+    req.isAuth = false;
+
     if (!authorization) {
-        const e = new Error('Not authenticated');
-        e.code = 401;
-        throw e;
+        return next();
     }
 
     const token = authorization.split(' ')[1];
@@ -13,18 +14,16 @@ const isAuth = (req, res, next) => {
     try {
         decoded = jwt.verify(token, process.env.JWT_SECRET);
     } catch (e) {
-        e.code = 500;
-        throw e;
+        return next();
     }
 
     if (decoded == null) {
-        const e = new Error('Invalid token');
-        e.code = 401;
-        throw e;
+        return next();
     }
 
     req.userId = decoded.userId;
+    req.isAuth = true;
     next();
 };
 
-export default isAuth;
+export default auth;

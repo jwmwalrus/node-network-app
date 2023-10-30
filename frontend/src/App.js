@@ -14,6 +14,7 @@ import SignupPage from './pages/Auth/Signup';
 import './App.css';
 
 const baseUrl = 'http://localhost:8080';
+const gql = String.raw;
 
 class App extends Component {
     state = {
@@ -65,36 +66,49 @@ class App extends Component {
     loginHandler = (event, authData) => {
         event.preventDefault();
         this.setState({ authLoading: true });
-        fetch(baseUrl + '/auth/login', {
+
+        const { email, password } = authData;
+        fetch(baseUrl + '/graphql', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                email: authData.email,
-                password: authData.password,
+                query: gql`
+                    query LoginUser($email: String!, $password: String!) {
+                        login(email: $email, password: $password) {
+                            token
+                            userId
+                        }
+                    }
+                `,
+                variables: { email, password },
             }),
         })
             .then((res) => {
-                if (res.status === 422) {
-                    throw new Error('Validation failed.');
-                }
-                if (res.status !== 200 && res.status !== 201) {
-                    console.log('Error!');
-                    throw new Error('Could not authenticate you!');
-                }
                 return res.json();
             })
             .then((resData) => {
+                if (resData.errors) {
+                    if (resData.errors[0].status === 422) {
+                        throw new Error('Validation failed.');
+                    } else {
+                        console.log('Error!');
+                        throw new Error('Could not authenticate you!');
+                    }
+                }
+
                 console.log({ resData });
+
+                const { token, userId } = resData.data.login;
                 this.setState({
                     isAuth: true,
-                    token: resData.token,
+                    token: token,
                     authLoading: false,
-                    userId: resData.userId,
+                    userId: userId,
                 });
-                localStorage.setItem('token', resData.token);
-                localStorage.setItem('userId', resData.userId);
+                localStorage.setItem('token', token);
+                localStorage.setItem('userId', userId);
                 const remainingMilliseconds = 60 * 60 * 1000;
                 const expiryDate = new Date(
                     new Date().getTime() + remainingMilliseconds,
@@ -116,30 +130,48 @@ class App extends Component {
         event.preventDefault();
         this.setState({ authLoading: true });
 
-        fetch(baseUrl + '/auth/signup', {
-            method: 'PUT',
+        const name = authData.signupForm.name.value;
+        const email = authData.signupForm.email.value;
+        const password = authData.signupForm.password.value;
+
+        fetch(baseUrl + '/graphql', {
+            method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                name: authData.signupForm.name.value,
-                email: authData.signupForm.email.value,
-                password: authData.signupForm.password.value,
+                query: gql`
+                    mutation SignupUser(
+                        $name: String!
+                        $email: String!
+                        $password: String!
+                    ) {
+                        createUser(
+                            userInput: {
+                                name: $name
+                                email: $email
+                                password: $password
+                            }
+                        ) {
+                            _id
+                        }
+                    }
+                `,
+                variables: { name, email, password },
             }),
         })
-            .then((res) => {
-                if (res.status === 422) {
-                    throw new Error(
-                        "Validation failed. Make sure the email address isn't used yet!",
-                    );
-                }
-                if (res.status !== 200 && res.status !== 201) {
-                    console.log('Error!');
-                    throw new Error('Creating a user failed!');
-                }
-                return res.json();
-            })
+            .then((res) => res.json())
             .then((resData) => {
+                if (resData.errors) {
+                    if (resData.errors[0].status === 422) {
+                        throw new Error(
+                            "Validation failed. Make sure the email address isn't used yet!",
+                        );
+                    } else {
+                        console.log('Error!');
+                        throw new Error('Creating a user failed!');
+                    }
+                }
                 console.log({ resData });
                 this.setState({ isAuth: false, authLoading: false });
                 this.props.history.replace('/');

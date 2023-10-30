@@ -4,6 +4,7 @@ import Image from '../../../components/Image/Image';
 import './SinglePost.css';
 
 let baseUrl = 'http://localhost:8080';
+const gql = String.raw;
 
 class SinglePost extends Component {
     state = {
@@ -16,24 +17,50 @@ class SinglePost extends Component {
 
     componentDidMount() {
         const postId = this.props.match.params.postId;
-        fetch(baseUrl + '/feed/posts/' + postId, {
-            headers: { Authorization: 'Bearer ' + this.props.token },
+        fetch(baseUrl + '/graphql', {
+            headers: {
+                Authorization: 'Bearer ' + this.props.token,
+                'Content-Type': 'application/json',
+            },
+            method: 'POST',
+            body: JSON.stringify({
+                query: gql`
+                    query FetchSinglePost($postId: ID!) {
+                        post(postId: $postId) {
+                            _id
+                            title
+                            content
+                            imageUrl
+                            creator {
+                                name
+                            }
+                            createdAt
+                        }
+                    }
+                `,
+                variables: { postId },
+            }),
         })
-            .then((res) => {
-                if (res.status !== 200) {
-                    throw new Error('Failed to fetch status');
-                }
-                return res.json();
-            })
+            .then((res) => res.json())
             .then((resData) => {
+                if (resData.errors) {
+                    if (resData.errors[0].status === 422) {
+                        throw new Error('Validation failed.');
+                    } else {
+                        console.log('Error!');
+                        throw new Error('Could not get post');
+                    }
+                }
+                console.log({ resData });
+
+                const { title, creator, createdAt, content, imageUrl } =
+                    resData.data.post;
                 this.setState({
-                    title: resData.post.title,
-                    author: resData.post.creator.name,
-                    date: new Date(resData.post.createdAt).toLocaleDateString(
-                        'en-US',
-                    ),
-                    content: resData.post.content,
-                    image: baseUrl + resData.post.imageUrl,
+                    title,
+                    author: creator.name,
+                    date: new Date(createdAt).toLocaleDateString('en-US'),
+                    content,
+                    image: baseUrl + imageUrl,
                 });
             })
             .catch(console.error);
