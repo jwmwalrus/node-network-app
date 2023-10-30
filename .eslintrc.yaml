@@ -28,4 +28,4 @@ rules:
   prefer-destructuring: off
   prefer-template: off
   consistent-return: off
-  no-underscore-dangle: [error, { allow: ['_id'] }]
+  no-underscore-dangle: [error, { allow: ['_id', '_doc'] }]
