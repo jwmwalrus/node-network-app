@@ -2,7 +2,7 @@ import { createServer } from 'http';
 import { resolve, basename, extname } from 'path';
 
 import express from 'express';
-import 'dotenv/config';
+import dotenv from 'dotenv-flow';
 import bodyParser from 'body-parser';
 import multer from 'multer';
 
@@ -13,6 +13,8 @@ import feedRoutes from './routes/feeds.js';
 import authRoutes from './routes/auth.js';
 
 import AppError from './middleware/errors.js';
+
+dotenv.config();
 
 const app = express();
 
@@ -56,7 +58,7 @@ app.use('/feed', feedRoutes);
 app.use('/auth', authRoutes);
 
 app.use((error, req, res, next) => {
-    console.error(error);
+    // console.error(error);
     if (error instanceof AppError) {
         return error.send(res);
     }
@@ -64,6 +66,8 @@ app.use((error, req, res, next) => {
     const e = new AppError(error.message, { code: error.code, cause: error });
     return e.send(res);
 });
+
+export default app;
 
 try {
     await connect(process.env.MONGODB_URI);

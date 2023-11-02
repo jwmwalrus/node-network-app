@@ -12,7 +12,6 @@ const ITEMS_PER_PAGE = 2;
 const dummyImage = '/image/dummy.png';
 
 export const getPost = async (req, res, next) => {
-    const { postId } = req.params;
     try {
         const post = await Post.findById(req.params.postId).populate('creator');
         if (post == null) {
@@ -102,6 +101,15 @@ export const createPost = async (req, res, next) => {
     } catch (e) {
         next(new AppError('Failed to create post', { cause: e }), req, res);
     }
+};
+
+const clearImage = async (image) => {
+    if (image === dummyImage) {
+        return;
+    }
+
+    const path = join(resolve('images'), image.replace(/^\/image\//, ''));
+    await unlink(path);
 };
 
 export const updatePost = async (req, res, next) => {
@@ -204,13 +212,4 @@ export const deletePost = async (req, res, next) => {
             res,
         );
     }
-};
-
-const clearImage = async (image) => {
-    if (image === dummyImage) {
-        return;
-    }
-
-    const path = join(resolve('images'), image.replace(/^\/image\//, ''));
-    await unlink(path);
 };
